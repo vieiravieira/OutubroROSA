@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caça ao Tesouro Rosa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap">
+<style>
+/* Layout: tela única para TV — grade 3x2 de cartinhas; ao abrir, um palco em tela cheia assume a cena */
+:root{
+  --rose-50:#fff0f6;
+  --rose-100:#ffd6e8;
+  --rose-300:#ff8fc0;
+  --rose-500:#e8418a;
+  --rose-700:#a3175a;
+  --rose-900:#5c0a32;
+  --gold:#ffd873;
+  --paper:#fffafc;
+  --ink:#4a0f2c;
+  --muted:#b9a7b0;
+  --muted-ink:#7d6c75;
+  --font-body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{
+  margin:0;overflow:hidden;font-family:var(--font-body);color:var(--ink);
+  background:
+    radial-gradient(1200px 700px at 20% 0%, var(--rose-300) 0%, transparent 60%),
+    radial-gradient(1000px 700px at 100% 100%, var(--rose-700) 0%, transparent 60%),
+    var(--rose-500);
+}
+.app{height:100%;display:flex;flex-direction:column;padding:2.5vh 16px;box-sizing:border-box;gap:2vh;position:relative}
+header{text-align:center;color:#fff;display:flex;flex-direction:column;gap:.4vh}
+header h1{font-weight:900;font-size:clamp(2rem,5.5vh,4.2rem);letter-spacing:-.01em;margin:0;line-height:1;text-shadow:0 4px 18px rgba(92,10,50,.35);text-wrap:balance}
+header p{margin:0;font-size:clamp(.95rem,2.2vh,1.5rem);font-weight:700;letter-spacing:.02em;opacity:.95}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:3vh 2.5vw;max-width:1500px;width:100%;margin:0 auto}
+@media (max-width:700px){.grid{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,1fr)}}
+
+/* Cartinha fechada = envelope */
+.card{
+  position:relative;border:0;padding:0;cursor:pointer;border-radius:18px;min-height:0;
+  background:linear-gradient(160deg,var(--rose-50),var(--rose-100));
+  box-shadow:0 14px 30px rgba(92,10,50,.35), inset 0 0 0 3px rgba(255,255,255,.7);
+  overflow:hidden;font-family:inherit;color:var(--rose-700);
+  transition:transform .35s cubic-bezier(.2,.9,.3,1.4), box-shadow .35s, filter .4s;
+  animation:bob 4s ease-in-out infinite;
+}
+.card:nth-child(2){animation-delay:-.7s}.card:nth-child(3){animation-delay:-1.4s}
+.card:nth-child(4){animation-delay:-2.1s}.card:nth-child(5){animation-delay:-2.8s}.card:nth-child(6){animation-delay:-3.5s}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-.6deg)}50%{transform:translateY(-6px) rotate(.6deg)}}
+.card:hover,.card:focus-visible{transform:translateY(-8px) scale(1.04);box-shadow:0 24px 40px rgba(92,10,50,.45), inset 0 0 0 3px #fff;animation-play-state:paused}
+.card:focus-visible{outline:4px solid var(--gold);outline-offset:4px}
+.flap{position:absolute;inset:0 0 auto 0;height:55%;background:linear-gradient(180deg,var(--rose-300),var(--rose-500));clip-path:polygon(0 0,100% 0,50% 100%);opacity:.92}
+.seal{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);width:clamp(64px,11vh,120px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ff7fb5,var(--rose-700));box-shadow:0 6px 14px rgba(92,10,50,.4), inset 0 -4px 8px rgba(0,0,0,.2);
+  display:grid;place-items:center;color:#fff;font-weight:900;font-size:clamp(1.8rem,6vh,3.6rem);line-height:1}
+.ribbon{position:absolute;right:12px;bottom:10px;width:clamp(26px,5vh,46px)}
+.card .tag{position:absolute;left:14px;bottom:12px;font-weight:800;font-size:clamp(.75rem,1.7vh,1.1rem);letter-spacing:.08em;text-transform:uppercase;color:var(--rose-700)}
+.card.opened{cursor:default;pointer-events:none;animation:none;filter:grayscale(1) brightness(.92);opacity:.55;transform:none}
+.card.opened .tag::after{content:" · aberta"}
+
+.tools{position:absolute;right:16px;bottom:10px;display:flex;gap:8px;align-items:center}
+.tools button{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:6px 12px;font:700 .8rem var(--font-body);cursor:pointer;opacity:.55}
+.tools button:hover,.tools button:focus-visible{opacity:1}
+
+/* Palco em tela cheia */
+.stage{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(92,10,50,0);transition:background .6s;perspective:2200px}
+.stage.dim{background:rgba(92,10,50,.55)}
+canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
+
+.flyer{position:fixed;left:0;top:0;transform-style:preserve-3d;z-index:20}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;overflow:hidden}
+.face.back{background:linear-gradient(160deg,var(--rose-50),var(--rose-100));box-shadow:0 30px 70px rgba(0,0,0,.35)}
+.face.front{transform:rotateY(180deg);background:var(--paper);box-shadow:0 30px 80px rgba(0,0,0,.4), inset 0 0 0 10px var(--rose-100), inset 0 0 0 12px var(--rose-300);
+  display:flex;flex-direction:column;padding:5vh 5vw;box-sizing:border-box;gap:2.2vh;color:var(--ink)}
+.letter-top{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.kicker{font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--rose-500);font-size:clamp(.8rem,2vh,1.3rem)}
+.letter-num{font-weight:800;color:var(--rose-300);font-size:clamp(1rem,2.6vh,1.8rem)}
+.big{font-weight:900;color:var(--rose-700);font-size:clamp(2.6rem,11vh,8rem);line-height:.95;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.lead{font-weight:800;font-size:clamp(1.4rem,4.2vh,3rem);color:var(--rose-500);line-height:1.15;margin:0;text-wrap:balance}
+.body{font-size:clamp(1rem,2.8vh,1.9rem);line-height:1.4;margin:0;max-width:52ch;font-weight:600}
+.help{margin-top:auto;border-top:2px dashed var(--rose-300);padding-top:2vh;display:flex;flex-direction:column;gap:.6vh}
+.help b{color:var(--rose-700);text-transform:uppercase;letter-spacing:.1em;font-size:clamp(.75rem,1.9vh,1.2rem)}
+.help span{font-size:clamp(.95rem,2.5vh,1.6rem);font-weight:800}
+.src{font-size:clamp(.65rem,1.4vh,.9rem);color:var(--muted-ink);font-weight:600}
+.cta-row{display:flex;justify-content:center;min-height:clamp(56px,9vh,96px)}
+
+.btn{font:900 clamp(1.1rem,3vh,2rem) var(--font-body);color:#fff;border:0;border-radius:999px;cursor:pointer;
+  padding:1.6vh 3.2vw;background:linear-gradient(180deg,#ff6aa8,var(--rose-700));
+  box-shadow:0 10px 0 var(--rose-900),0 18px 30px rgba(92,10,50,.4);letter-spacing:.02em;
+  animation:pop .6s cubic-bezier(.2,1.6,.4,1) both, glow 1.6s ease-in-out .6s infinite}
+.btn:active{transform:translateY(6px);box-shadow:0 4px 0 var(--rose-900),0 8px 16px rgba(92,10,50,.4)}
+.btn:focus-visible{outline:4px solid var(--gold);outline-offset:6px}
+@keyframes pop{from{transform:scale(0) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 0 rgba(255,216,115,0))}50%{filter:drop-shadow(0 0 18px rgba(255,216,115,.9))}}
+
+/* Caixa de presente */
+.gift-scene{position:fixed;inset:0;z-index:25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4vh;padding:0 16px;text-align:center}
+.box{position:relative;width:clamp(180px,34vh,340px);aspect-ratio:1/1;max-width:100%}
+.box .base{position:absolute;left:6%;right:6%;bottom:0;height:68%;border-radius:10px;background:linear-gradient(90deg,var(--rose-500),#ff78b2 50%,var(--rose-500));box-shadow:inset 0 -18px 30px rgba(92,10,50,.35),0 30px 50px rgba(0,0,0,.35)}
+.box .lid{position:absolute;left:0;right:0;top:18%;height:20%;border-radius:10px;background:linear-gradient(90deg,var(--rose-700),#ff5a9f 50%,var(--rose-700));box-shadow:0 8px 14px rgba(0,0,0,.25);transform-origin:50% 100%}
+.box .vband{position:absolute;left:50%;width:15%;transform:translateX(-50%);top:0;bottom:0;background:var(--gold)}
+.box .bow{position:absolute;left:50%;bottom:95%;transform:translateX(-50%);width:62%;height:auto}
+.box.shake{animation:shake 2s cubic-bezier(.36,.07,.19,.97) both}
+.box.shake .lid{animation:lidhop 2s ease-in both}
+@keyframes shake{
+  0%{transform:scale(1)}
+  10%{transform:rotate(-4deg) scale(1.03,.97)}15%{transform:rotate(4deg) scale(.97,1.04)}
+  25%{transform:rotate(-6deg) scale(1.06,.95)}30%{transform:rotate(6deg) scale(.95,1.07)}
+  45%{transform:rotate(-9deg) scale(1.1,.92)}50%{transform:rotate(9deg) scale(.92,1.12)}
+  65%{transform:rotate(-12deg) scale(1.15,.9)}70%{transform:rotate(12deg) scale(.9,1.18)}
+  82%{transform:rotate(-14deg) scale(1.2,.88)}88%{transform:rotate(14deg) scale(.88,1.25)}
+  94%{transform:rotate(-6deg) scale(1.3,.85)}100%{transform:scale(1.35,.8)}}
+@keyframes lidhop{0%,40%{transform:none}45%{transform:translateY(-10%)}50%{transform:none}62%{transform:translateY(-25%) rotate(-4deg)}68%{transform:none}80%{transform:translateY(-40%) rotate(5deg)}86%{transform:none}94%{transform:translateY(-60%) rotate(-6deg)}100%{transform:translateY(-20%)}}
+.box.burst .lid{animation:lidfly .9s cubic-bezier(.2,.8,.3,1) forwards}
+.box.burst .base{animation:basepop .5s ease-out forwards}
+@keyframes lidfly{to{transform:translateY(-260%) rotate(-38deg);opacity:0}}
+@keyframes basepop{0%{transform:scale(1.3,.8)}60%{transform:scale(.9,1.1)}100%{transform:scale(0);opacity:0}}
+
+.prize{color:#fff;display:flex;flex-direction:column;gap:1.5vh;align-items:center;max-width:1200px}
+.prize .congrats{font-weight:900;font-size:clamp(2.6rem,9vh,6.5rem);line-height:1;text-shadow:0 6px 24px rgba(92,10,50,.6)}
+.prize .line{font-weight:800;font-size:clamp(1.1rem,3.2vh,2.2rem);text-wrap:balance}
+.prize .reward{font-weight:900;font-size:clamp(2rem,8vh,6rem);line-height:1.05;color:var(--gold);text-shadow:0 0 24px rgba(255,216,115,.7),0 6px 0 var(--rose-900);text-wrap:balance}
+.prize.blink .reward,.prize.blink .congrats{animation:slowblink 1.25s ease-in-out 4}
+@keyframes slowblink{0%,100%{opacity:1}50%{opacity:.25}}
+.prize .appear{animation:pop .8s cubic-bezier(.2,1.6,.4,1) both}
+
+@media (prefers-reduced-motion:reduce){
+  .card{animation:none}
+  .box.shake,.box.shake .lid{animation-duration:2s;animation-name:none}
+  .prize.blink .reward,.prize.blink .congrats{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <h1>Caça ao Tesouro Rosa</h1>
+    <p>Achou o brinde na operação? Toque na cartinha com o mesmo número.</p>
+  </header>
+  <main class="grid" id="grid" aria-label="Cartinhas"></main>
+  <div class="tools">
+    <button type="button" id="somBtn"></button>
+    <button type="button" id="fsBtn">Tela cheia</button>
+    <button type="button" id="resetBtn">Reiniciar cartas</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+/* ====== EDITE AQUI: brinde de cada carta ====== */
+const BRINDES = [
+  "1 DIA DE FOLGA EXTRA",
+  "1 DIA DE FOLGA EXTRA",
+  "1 DIA DE FOLGA EXTRA",
+  "1 DIA DE FOLGA EXTRA",
+  "1 DIA DE FOLGA EXTRA",
+  "1 DIA DE FOLGA EXTRA"
+];
+
+/* Mensagens de conscientização (fonte: INCA / Ministério da Saúde) */
+const HELP = "UBS (posto de saúde) mais perto de você · Disque Saúde 136 (ligação gratuita)";
+const CARTAS = [
+  {big:"78.610", lead:"novos casos por ano no Brasil",
+   body:"O câncer de mama é o tipo de câncer mais comum entre as mulheres brasileiras. Informação salva vidas: fale sobre isso com quem você ama.",
+   src:"INCA, Estimativa 2026–2028"},
+  {big:"Até 95%", lead:"de chance de cura quando descoberto cedo",
+   body:"Quanto antes o diagnóstico, mais simples o tratamento. Não deixe seus exames para depois.",
+   src:"Oncologistas / INCA"},
+  {big:"Conheça seu corpo", lead:"observe, toque e não ignore sinais",
+   body:"Caroço na mama ou axila, pele parecendo casca de laranja, mamilo que afunda ou saída de líquido. Notou algo diferente? Procure atendimento.",
+   src:"INCA"},
+  {big:"Mamografia", lead:"é gratuita pelo SUS",
+   body:"Mulheres de 50 a 69 anos devem fazer a cada 2 anos. Tem entre 40 e 49 anos? Converse com o médico da UBS sobre o exame.",
+   src:"Ministério da Saúde"},
+  {big:"30%", lead:"dos cânceres nas mulheres são de mama",
+   body:"Praticar atividade física, manter o peso saudável e evitar álcool e cigarro ajudam a reduzir o risco.",
+   src:"INCA, Estimativa 2026 (exceto pele não melanoma)"},
+  {big:"Homens também", lead:"podem ter câncer de mama",
+   body:"É raro, cerca de 1% dos casos, mas acontece. Caroço no peito ou mamilo diferente também merece consulta.",
+   src:"INCA"}
+];
+
+/* ====== estado ====== */
+const KEY = "caca-rosa-abertas";
+let abertas = [];
+try { abertas = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch(e){ abertas = []; }
+const salvar = () => { try { localStorage.setItem(KEY, JSON.stringify(abertas)); } catch(e){} };
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const ribbonSVG = `<svg class="ribbon" viewBox="0 0 40 60" aria-hidden="true"><path d="M20 4c-7 0-11 6-9 13l6 13-9 22 8 4 4-14 4 14 8-4-9-22 6-13c2-7-2-13-9-13zm0 6c3 0 5 3 4 6l-4 8-4-8c-1-3 1-6 4-6z" fill="#e8418a"/></svg>`;
+
+const grid = document.getElementById("grid");
+function render(){
+  grid.innerHTML = "";
+  CARTAS.forEach((c,i)=>{
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "card" + (abertas.includes(i) ? " opened" : "");
+    b.setAttribute("aria-label", "Cartinha " + (i+1) + (abertas.includes(i) ? " (já aberta)" : ""));
+    if (abertas.includes(i)) b.disabled = true;
+    b.innerHTML = `<div class="flap"></div><div class="seal">${i+1}</div>${ribbonSVG}<span class="tag">Carta ${i+1}</span>`;
+    b.addEventListener("click", ()=>abrir(i,b));
+    grid.appendChild(b);
+  });
+}
+render();
+
+/* ====== partículas (brilhos estilo mágico + confete) ====== */
+const cv = document.getElementById("fx"), ctx = cv.getContext("2d");
+let parts = [], raf = null;
+function fit(){ cv.width = innerWidth*devicePixelRatio; cv.height = innerHeight*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+fit(); addEventListener("resize", fit);
+const COLORS = ["#fff","#ffd873","#ffd6e8","#ff8fc0","#ffffff"];
+function sparkle(x,y,n,spread=6){
+  for(let k=0;k<n;k++){
+    const a=Math.random()*Math.PI*2, s=Math.random()*spread+1;
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:.012+Math.random()*.02,size:2+Math.random()*4,c:COLORS[k%COLORS.length],star:Math.random()<.5,g:.04});
+  }
+  loop();
+}
+function confetti(x,y,n){
+  const cc=["#ffd873","#ff8fc0","#fff","#e8418a","#ffd6e8","#a3175a"];
+  for(let k=0;k<n;k++){
+    const a=-Math.PI/2+(Math.random()-.5)*2.4, s=6+Math.random()*14;
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:.005+Math.random()*.006,size:6+Math.random()*8,c:cc[k%cc.length],rect:true,rot:Math.random()*6,vr:(Math.random()-.5)*.3,g:.25});
+  }
+  loop();
+}
+function star(x,y,r){ctx.beginPath();for(let i=0;i<8;i++){const rr=i%2?r*.35:r;const a=i*Math.PI/4;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);}ctx.closePath();ctx.fill();}
+function loop(){
+  if(raf) return;
+  const step=()=>{
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    parts = parts.filter(p=>p.life>0);
+    for(const p of parts){
+      p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.vx*=.99; p.life-=p.decay;
+      ctx.globalAlpha=Math.max(p.life,0); ctx.fillStyle=p.c;
+      if(p.rect){p.rot+=p.vr;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.size/2,-p.size/4,p.size,p.size/2);ctx.restore();}
+      else if(p.star){ctx.shadowColor="#fff";ctx.shadowBlur=10;star(p.x,p.y,p.size*1.4);ctx.shadowBlur=0;}
+      else{ctx.beginPath();ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);ctx.fill();}
+    }
+    ctx.globalAlpha=1;
+    if(parts.length){raf=requestAnimationFrame(step);} else {raf=null;}
+  };
+  raf=requestAnimationFrame(step);
+}
+
+/* ====== música (gerada no navegador, sem arquivos) ====== */
+let AC=null, master=null, somLigado=true;
+try{ somLigado = localStorage.getItem("caca-rosa-som")!=="off"; }catch(e){}
+function audio(){
+  if(!somLigado) return null;
+  if(!AC){
+    const C = window.AudioContext||window.webkitAudioContext; if(!C) return null;
+    AC = new C();
+    const comp = AC.createDynamicsCompressor();
+    master = AC.createGain(); master.gain.value = .55;
+    // eco suave para dar ar de "caixinha de música"
+    const dly = AC.createDelay(); dly.delayTime.value = .23;
+    const fb = AC.createGain(); fb.gain.value = .28;
+    const wet = AC.createGain(); wet.gain.value = .3;
+    const lp = AC.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=3200;
+    master.connect(comp); master.connect(dly); dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(wet); wet.connect(comp);
+    comp.connect(AC.destination);
+  }
+  if(AC.state==="suspended") AC.resume();
+  return AC;
+}
+const hz = n => 440*Math.pow(2,(n-69)/12); // nota MIDI -> Hz
+function tom(n, t, dur, vol=.18, tipo="triangle"){
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = tipo; o.frequency.value = hz(n);
+  // um segundo oscilador uma oitava acima dá brilho de sininho
+  const o2 = AC.createOscillator(), g2 = AC.createGain(); o2.type="sine"; o2.frequency.value = hz(n+12); g2.gain.value=.25;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.012); g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+  o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
+  o.start(t); o2.start(t); o.stop(t+dur+.05); o2.stop(t+dur+.05);
+}
+// 1) Carta abrindo: harpa subindo + brilhos
+function somCarta(){
+  if(!audio()) return; const t=AC.currentTime+.02;
+  const esc=[60,64,67,71,72,76,79,83,84,88,91];
+  esc.forEach((n,k)=>tom(n, t+k*.11, 1.4, .14));
+  [96,100,103,108].forEach((n,k)=>tom(n, t+1.3+k*.09, .9, .06, "sine"));
+  [60,64,67,72].forEach(n=>tom(n-12, t+1.25, 2.4, .07, "sine"));
+}
+// 2) Caixa tremendo: marimba acelerando e subindo (suspense gostoso)
+function somSuspense(){
+  if(!audio()) return; const t0=AC.currentTime+.02;
+  let t=t0, gap=.26, n=67;
+  while(t < t0+1.95){
+    tom(n, t, .25, .12, "sine"); tom(n-12, t, .25, .05, "sine");
+    t += gap; gap = Math.max(.06, gap*.86); if(Math.random()<.6) n = Math.min(n+1, 84);
+  }
+}
+// 3) Brinde: "pop" + uma música diferente para cada carta
+function pop(t){
+  const len=AC.sampleRate*.25, buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+  const src=AC.createBufferSource(); src.buffer=buf; const f=AC.createBiquadFilter(); f.type="lowpass"; f.frequency.value=1400;
+  const g=AC.createGain(); g.gain.value=.5; src.connect(f); f.connect(g); g.connect(master); src.start(t);
+}
+function chocalho(t, vol=.07){
+  const len=AC.sampleRate*.06, buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+  const src=AC.createBufferSource(); src.buffer=buf; const f=AC.createBiquadFilter(); f.type="highpass"; f.frequency.value=5000;
+  const g=AC.createGain(); g.gain.value=vol; src.connect(f); f.connect(g); g.connect(master); src.start(t);
+}
+const acorde = (t, notas, dur=2.6, vol=.06) => notas.forEach(n=>tom(n, t, dur, vol, "sine"));
+const MUSICAS = [
+  // Carta 1: Tã-dã clássico
+  t=>{ [[72,0,.18],[76,.16,.18],[79,.32,.18],[84,.5,1.8]].forEach(([n,dt,du])=>{tom(n,t+dt,du+.4,.18,"square");tom(n,t+dt,du+.6,.12);});
+       acorde(t+.5,[48,55,60,64,67]); for(let k=0;k<8;k++) tom(84+[0,4,7,12][k%4], t+.7+k*.12, .6, .05, "sine"); },
+  // Carta 2: Festa animada, saltitante
+  t=>{ const m=[65,69,72,69,74,72,69,72,77]; m.forEach((n,k)=>tom(n,t+k*.13,.3,.16));
+       [41,48,41,48,41,48,53].forEach((n,k)=>tom(n,t+k*.26,.28,.12,"triangle"));
+       tom(77,t+1.17,1.6,.16,"square"); acorde(t+1.17,[53,57,60,65,69]); },
+  // Carta 3: Caixinha de música (valsa)
+  t=>{ const m=[79,83,86,91,86,83,79,86,91,95]; m.forEach((n,k)=>tom(n,t+k*.19,1.1,.13,"sine"));
+       [43,55,59,43,55,59,43,55,59].forEach((n,k)=>tom(n,t+k*.19,.5,k%3?.04:.09,"sine"));
+       acorde(t+1.9,[67,71,74,79],2.4,.07); },
+  // Carta 4: Vitória (tã-tã-tã-tããã)
+  t=>{ [[74,0,.12],[74,.14,.12],[74,.28,.12],[78,.44,.3],[81,.78,.12],[78,.92,.12],[86,1.08,1.6]].forEach(([n,dt,du])=>{tom(n,t+dt,du+.3,.16,"square");tom(n-12,t+dt,du+.3,.08,"triangle");});
+       acorde(t+1.08,[50,57,62,66,69],2.6,.07); },
+  // Carta 5: Mágica (harpa descendo e subindo)
+  t=>{ const up=[63,67,70,74,75,79,82,86,87]; [...up].reverse().forEach((n,k)=>tom(n,t+k*.06,.8,.09));
+       up.forEach((n,k)=>tom(n,t+.6+k*.07,1.2,.11));
+       tom(87,t+1.3,2.2,.14,"triangle"); acorde(t+1.3,[51,58,63,67,70],2.8,.07);
+       for(let k=0;k<6;k++) tom(99+[0,3,7][k%3], t+1.5+k*.15, .5, .04, "sine"); },
+  // Carta 6: Sambinha alegre com chocalho
+  t=>{ const beat=.15; for(let k=0;k<16;k++) chocalho(t+k*beat, k%2?.05:.09);
+       [[69,0],[73,1],[76,3],[73,4],[78,6],[76,7],[73,9],[76,10],[81,12]].forEach(([n,st])=>tom(n,t+st*beat,.35,.15));
+       [45,52,45,52,45,52,45,57].forEach((n,k)=>tom(n,t+k*beat*2,.28,.12,"triangle"));
+       tom(81,t+12*beat,1.6,.14,"square"); acorde(t+12*beat,[57,61,64,69],2.2,.07); }
+];
+function somBrinde(i){
+  if(!audio()) return; const t=AC.currentTime+.01;
+  pop(t);
+  (MUSICAS[i % MUSICAS.length])(t+.12);
+}
+
+/* ====== abrir carta ====== */
+let ocupado = false, timers = [];
+const wait = ms => new Promise(r=>timers.push(setTimeout(r,ms)));
+
+async function abrir(i, cardEl){
+  if(ocupado || abertas.includes(i)) return;
+  ocupado = true;
+  const c = CARTAS[i];
+  const r = cardEl.getBoundingClientRect();
+  cardEl.style.visibility = "hidden";
+
+  const stage = document.createElement("div");
+  stage.className = "stage";
+  document.body.appendChild(stage);
+  requestAnimationFrame(()=>stage.classList.add("dim"));
+
+  const W = Math.min(innerWidth*0.9, 1150), H = Math.min(innerHeight*0.88, 900);
+  const fly = document.createElement("div");
+  fly.className = "flyer";
+  fly.style.width = W+"px"; fly.style.height = H+"px";
+  fly.innerHTML = `
+    <div class="face back"><div class="flap"></div><div class="seal" style="width:${Math.min(W,H)*.22}px;font-size:${Math.min(W,H)*.12}px">${i+1}</div></div>
+    <div class="face front" role="dialog" aria-label="Carta ${i+1}">
+      <div class="letter-top"><span class="kicker">Outubro Rosa</span><span class="letter-num">carta nº ${i+1}</span></div>
+      <div class="big">${c.big}</div>
+      <p class="lead">${c.lead}</p>
+      <p class="body">${c.body}</p>
+      <div class="help"><b>Onde procurar ajuda</b><span>${HELP}</span><span class="src">Fonte: ${c.src}</span></div>
+      <div class="cta-row" id="cta"></div>
+    </div>`;
+  stage.appendChild(fly);
+
+  // posição inicial = cartinha; final = centro da tela
+  const sx = r.width/W, sy = r.height/H;
+  const x0 = r.left + r.width/2 - W/2, y0 = r.top + r.height/2 - H/2;
+  const x1 = (innerWidth - W)/2, y1 = (innerHeight - H)/2;
+  const dur = reduce ? 400 : 2200;
+  somCarta();
+
+  // trilha de brilhos seguindo a carta
+  let trail = null;
+  if(!reduce){
+    const t0 = performance.now();
+    trail = setInterval(()=>{
+      const k = Math.min((performance.now()-t0)/dur,1);
+      const e = 1-Math.pow(1-k,3);
+      const cx = r.left+r.width/2 + (innerWidth/2-(r.left+r.width/2))*e;
+      const cy = r.top+r.height/2 + (innerHeight/2-(r.top+r.height/2))*e - Math.sin(k*Math.PI)*innerHeight*.18;
+      sparkle(cx + (Math.random()-.5)*W*e*.9, cy + (Math.random()-.5)*H*e*.9, 6, 3);
+    }, 40);
+  }
+
+  const anim = fly.animate([
+    {transform:`translate(${x0}px,${y0}px) scale(${sx},${sy}) rotateY(0deg) rotateZ(0deg)`, offset:0},
+    {transform:`translate(${(x0+x1)/2}px,${(y0+y1)/2 - innerHeight*.18}px) scale(${(sx+1)/2*0.8}) rotateY(450deg) rotateZ(-8deg)`, offset:.55},
+    {transform:`translate(${x1}px,${y1}px) scale(1.04) rotateY(880deg) rotateZ(2deg)`, offset:.85},
+    {transform:`translate(${x1}px,${y1}px) scale(1) rotateY(900deg) rotateZ(0deg)`, offset:1}
+  ], {duration:dur, easing:"cubic-bezier(.45,.05,.25,1)", fill:"forwards"});
+  await anim.finished;
+  if(trail) clearInterval(trail);
+  if(!reduce){ sparkle(innerWidth/2, innerHeight*0.12, 60, 9); sparkle(innerWidth*0.08, innerHeight*0.5, 30, 7); sparkle(innerWidth*0.92, innerHeight*0.5, 30, 7); }
+
+  // 10 segundos de leitura, depois o botão
+  await wait(10000);
+  const cta = fly.querySelector("#cta");
+  const bAbrir = document.createElement("button");
+  bAbrir.type="button"; bAbrir.className="btn"; bAbrir.textContent="🎁 Abra o brinde";
+  cta.appendChild(bAbrir);
+  bAbrir.focus({preventScroll:true});
+  await new Promise(res=>bAbrir.addEventListener("click",res,{once:true}));
+
+  // sai a carta, entra a caixa
+  await fly.animate([{opacity:1,transform:getComputedStyle(fly).transform},{opacity:0,transform:getComputedStyle(fly).transform+" scale(.85)"}],{duration:400,fill:"forwards"}).finished;
+  fly.remove();
+
+  const scene = document.createElement("div");
+  scene.className = "gift-scene";
+  scene.innerHTML = `
+    <div class="box" id="box">
+      <div class="base"><div class="vband"></div></div>
+      <div class="lid"><div class="vband"></div>
+        <svg class="bow" viewBox="0 0 120 60" aria-hidden="true"><path d="M60 50C40 20 10 5 8 25s30 28 52 25zm0 0c20-30 50-45 52-25S82 53 60 50z" fill="#ffd873" stroke="#c99a1c" stroke-width="3"/><circle cx="60" cy="48" r="9" fill="#ffd873" stroke="#c99a1c" stroke-width="3"/></svg>
+      </div>
+    </div>`;
+  stage.appendChild(scene);
+  const box = scene.querySelector("#box");
+  requestAnimationFrame(()=>box.classList.add("shake"));
+  somSuspense();
+  // brilhos escapando enquanto treme
+  let leak = null;
+  if(!reduce){
+    leak = setInterval(()=>{
+      const br = box.getBoundingClientRect();
+      sparkle(br.left+br.width*(.2+Math.random()*.6), br.top+br.height*.3, 3, 4);
+    }, 90);
+  }
+  await wait(2000);
+  if(leak) clearInterval(leak);
+
+  // explode!
+  box.classList.remove("shake"); box.classList.add("burst");
+  somBrinde(i);
+  const br = box.getBoundingClientRect();
+  confetti(br.left+br.width/2, br.top+br.height/2, 260);
+  sparkle(br.left+br.width/2, br.top+br.height/2, 120, 12);
+  await wait(450);
+  box.remove();
+
+  const prize = document.createElement("div");
+  prize.className = "prize";
+  prize.innerHTML = `
+    <div class="congrats appear">Parabéns!</div>
+    <div class="line appear" style="animation-delay:.15s">Você achou a carta premiada e por isso GANHOU</div>
+    <div class="reward appear" style="animation-delay:.3s">${BRINDES[i]}</div>`;
+  scene.appendChild(prize);
+  await wait(900);
+  prize.classList.add("blink");
+  const rain = reduce ? null : setInterval(()=>confetti(Math.random()*innerWidth, innerHeight*.05, 18), 600);
+  await wait(5000);
+  if(rain) clearInterval(rain);
+
+  const bVoltar = document.createElement("button");
+  bVoltar.type="button"; bVoltar.className="btn"; bVoltar.textContent="Voltar";
+  scene.appendChild(bVoltar);
+  bVoltar.focus({preventScroll:true});
+  await new Promise(res=>bVoltar.addEventListener("click",res,{once:true}));
+
+  // volta e trava a carta
+  abertas.push(i); salvar();
+  await stage.animate([{opacity:1},{opacity:0}],{duration:450,fill:"forwards"}).finished;
+  stage.remove();
+  render();
+  ocupado = false;
+}
+
+/* ====== ferramentas ====== */
+const somBtn = document.getElementById("somBtn");
+const pintaSom = () => somBtn.textContent = somLigado ? "Som: ligado" : "Som: desligado";
+pintaSom();
+somBtn.addEventListener("click", ()=>{
+  somLigado = !somLigado; pintaSom();
+  try{ localStorage.setItem("caca-rosa-som", somLigado?"on":"off"); }catch(e){}
+  if(somLigado && audio()) tom(79, AC.currentTime+.02, .5, .12);
+});
+document.getElementById("fsBtn").addEventListener("click", ()=>{
+  const el = document.documentElement;
+  try{
+    if(!document.fullscreenElement){ el.requestFullscreen && el.requestFullscreen().catch(()=>{}); }
+    else { document.exitFullscreen && document.exitFullscreen().catch(()=>{}); }
+  }catch(e){}
+});
+const resetBtn = document.getElementById("resetBtn");
+let armed = false, armT = null;
+resetBtn.addEventListener("click", ()=>{
+  if(!armed){
+    armed = true; resetBtn.textContent = "Clique de novo para confirmar";
+    armT = setTimeout(()=>{armed=false;resetBtn.textContent="Reiniciar cartas";},3000);
+    return;
+  }
+  clearTimeout(armT); armed=false; resetBtn.textContent="Reiniciar cartas";
+  abertas=[]; salvar(); render();
+});
+</script>
+</body>
+</html>
