@@ -133,26 +133,61 @@ canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-in
   .box.shake,.box.shake .lid{animation-duration:2s;animation-name:none}
   .prize.blink .reward,.prize.blink .congrats{animation:none}
 }
+
+/* Painel de configuração */
+.unit{margin:0;font-weight:800;font-size:clamp(.8rem,1.9vh,1.2rem);letter-spacing:.14em;text-transform:uppercase;color:var(--rose-100)}
+.cfg{position:fixed;inset:0;z-index:50;background:rgba(92,10,50,.6);display:grid;place-items:center;padding:16px;box-sizing:border-box}
+.cfg-box{background:var(--paper);color:var(--ink);border-radius:18px;box-shadow:0 30px 70px rgba(0,0,0,.4);width:100%;max-width:640px;max-height:100%;overflow:auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.cfg-box h2{margin:0;font-size:1.4rem;font-weight:900;color:var(--rose-700)}
+.cfg-box p.hint{margin:0;font-size:.92rem;color:var(--muted-ink);line-height:1.4}
+.cfg-row{display:grid;grid-template-columns:5.5rem 1fr;gap:10px;align-items:center}
+.cfg-row label{font-weight:800;font-size:.9rem;color:var(--rose-700)}
+.cfg-row input{min-width:0;font:700 1rem var(--font-body);color:var(--ink);background:#fff;border:2px solid var(--rose-100);border-radius:10px;padding:10px 12px}
+.cfg-row input:focus{outline:none;border-color:var(--rose-500)}
+.cfg-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:4px}
+.cfg-actions button{font:800 .95rem var(--font-body);border-radius:999px;padding:10px 18px;cursor:pointer;border:2px solid var(--rose-500)}
+.cfg-actions .primary{background:var(--rose-500);color:#fff}
+.cfg-actions .ghost{background:transparent;color:var(--rose-700)}
+.cfg-actions .link{border-color:transparent;background:transparent;color:var(--muted-ink);margin-right:auto}
+.cfg-actions button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.cfg-msg{font-weight:800;color:var(--rose-700);font-size:.9rem;min-height:1.2em;margin:0}
+@media (max-width:480px){.cfg-row{grid-template-columns:1fr;gap:4px}}
 </style>
 </head>
 <body>
 <div class="app" id="app">
   <header>
     <h1>Caça ao Tesouro Rosa</h1>
+    <p class="unit" id="unidadeTxt" hidden></p>
     <p>Achou o brinde na operação? Toque na cartinha com o mesmo número.</p>
   </header>
   <main class="grid" id="grid" aria-label="Cartinhas"></main>
   <div class="tools">
+    <button type="button" id="cfgBtn">Configurar brindes</button>
     <button type="button" id="somBtn"></button>
     <button type="button" id="fsBtn">Tela cheia</button>
     <button type="button" id="resetBtn">Reiniciar cartas</button>
   </div>
 </div>
+<div class="cfg" id="cfg" hidden>
+  <form class="cfg-box" id="cfgForm" autocomplete="off">
+    <h2>Configurar brindes</h2>
+    <p class="hint">Vale só para este computador. Cada unidade configura os brindes no PC da própria TV.</p>
+    <div class="cfg-row"><label for="cfgUnidade">Unidade</label><input id="cfgUnidade" maxlength="40" placeholder="Ex.: SVC Cajamar (opcional)"></div>
+    <div id="cfgBrindes" style="display:flex;flex-direction:column;gap:10px"></div>
+    <p class="cfg-msg" id="cfgMsg" aria-live="polite"></p>
+    <div class="cfg-actions">
+      <button type="button" class="link" id="cfgPadrao">Voltar ao padrão</button>
+      <button type="button" class="ghost" id="cfgCancelar">Cancelar</button>
+      <button type="submit" class="primary">Salvar</button>
+    </div>
+  </form>
+</div>
 <canvas id="fx"></canvas>
 
 <script>
-/* ====== EDITE AQUI: brinde de cada carta ====== */
-const BRINDES = [
+/* ====== Brindes padrão (podem ser trocados na tela em "Configurar brindes") ====== */
+const BRINDES_PADRAO = [
   "1 DIA DE FOLGA EXTRA",
   "1 DIA DE FOLGA EXTRA",
   "1 DIA DE FOLGA EXTRA",
@@ -183,6 +218,23 @@ const CARTAS = [
    body:"É raro, cerca de 1% dos casos, mas acontece. Caroço no peito ou mamilo diferente também merece consulta.",
    src:"INCA"}
 ];
+
+/* ====== configuração salva neste computador ====== */
+const CFG_KEY = "caca-rosa-config";
+let BRINDES = [...BRINDES_PADRAO], UNIDADE = "";
+try{
+  const c = JSON.parse(localStorage.getItem(CFG_KEY) || "null");
+  if(c){
+    if(Array.isArray(c.brindes)) BRINDES = BRINDES_PADRAO.map((d,k)=> (c.brindes[k]||"").trim() || d);
+    if(typeof c.unidade === "string") UNIDADE = c.unidade.trim();
+  }
+}catch(e){}
+function mostraUnidade(){
+  const el = document.getElementById("unidadeTxt");
+  el.textContent = UNIDADE; el.hidden = !UNIDADE;
+}
+mostraUnidade();
+const esc = t => String(t).replace(/[&<>"']/g, ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 
 /* ====== estado ====== */
 const KEY = "caca-rosa-abertas";
@@ -455,7 +507,7 @@ async function abrir(i, cardEl){
   prize.innerHTML = `
     <div class="congrats appear">Parabéns!</div>
     <div class="line appear" style="animation-delay:.15s">Você achou a carta premiada e por isso GANHOU</div>
-    <div class="reward appear" style="animation-delay:.3s">${BRINDES[i]}</div>`;
+    <div class="reward appear" style="animation-delay:.3s">${esc(BRINDES[i])}</div>`;
   scene.appendChild(prize);
   await wait(900);
   prize.classList.add("blink");
@@ -478,6 +530,35 @@ async function abrir(i, cardEl){
 }
 
 /* ====== ferramentas ====== */
+const cfg = document.getElementById("cfg"), cfgForm = document.getElementById("cfgForm");
+const cfgBrindes = document.getElementById("cfgBrindes"), cfgUnidade = document.getElementById("cfgUnidade"), cfgMsg = document.getElementById("cfgMsg");
+cfgBrindes.innerHTML = BRINDES_PADRAO.map((_,k)=>`<div class="cfg-row"><label for="cfgB${k}">Carta ${k+1}</label><input id="cfgB${k}" maxlength="80"></div>`).join("");
+function preencheCfg(lista, unidade){
+  lista.forEach((b,k)=>document.getElementById("cfgB"+k).value = b);
+  cfgUnidade.value = unidade;
+}
+function abreCfg(){
+  if(ocupado) return;
+  preencheCfg(BRINDES, UNIDADE); cfgMsg.textContent = "";
+  cfg.hidden = false; document.getElementById("cfgB0").focus();
+}
+function fechaCfg(){ cfg.hidden = true; document.getElementById("cfgBtn").focus(); }
+document.getElementById("cfgBtn").addEventListener("click", abreCfg);
+document.getElementById("cfgCancelar").addEventListener("click", fechaCfg);
+cfg.addEventListener("click", e=>{ if(e.target===cfg) fechaCfg(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !cfg.hidden) fechaCfg(); });
+document.getElementById("cfgPadrao").addEventListener("click", ()=>{
+  preencheCfg(BRINDES_PADRAO, cfgUnidade.value);
+  cfgMsg.textContent = "Brindes voltaram ao padrão. Clique em Salvar para confirmar.";
+});
+cfgForm.addEventListener("submit", e=>{
+  e.preventDefault();
+  BRINDES = BRINDES_PADRAO.map((d,k)=> document.getElementById("cfgB"+k).value.trim() || d);
+  UNIDADE = cfgUnidade.value.trim();
+  try{ localStorage.setItem(CFG_KEY, JSON.stringify({brindes:BRINDES, unidade:UNIDADE})); }
+  catch(err){ cfgMsg.textContent = "Não deu para salvar neste navegador (modo anônimo?). Os brindes valem só até fechar a página."; mostraUnidade(); return; }
+  mostraUnidade(); fechaCfg();
+});
 const somBtn = document.getElementById("somBtn");
 const pintaSom = () => somBtn.textContent = somLigado ? "Som: ligado" : "Som: desligado";
 pintaSom();
